@@ -2,8 +2,7 @@
 
 namespace OAS;
 
-use OAS\Resolver\Resolver;
-use Biera\{ArrayConstructor, ArrayAccessor};
+use Biera\ArrayAccessor;
 use function iter\all;
 use function iter\func\operator;
 use function Biera\retrieveByPath;
@@ -14,10 +13,7 @@ use function Biera\pathSegments;
  */
 class Schema implements \JsonSerializable, \ArrayAccess
 {
-    use ArrayConstructor, ArrayAccessor;
-
-    public static ?Resolver $resolver = null;
-    public static bool $resolve = true;
+    use ArrayAccessor;
 
     public const TYPE_NULL = 'null';
     public const TYPE_STRING = 'string';
@@ -308,66 +304,37 @@ class Schema implements \JsonSerializable, \ArrayAccess
             $params['const'] = new Schema\ConstNull;
         }
 
-        return self::doCreateFromArray($params);
-    }
+        $constructorParametersMeta =
+            (new \ReflectionClass(__CLASS__))
+                ->getConstructor()
+                ->getParameters();
 
-    public static function getResolver(): Resolver
-    {
-        if (\is_null(self::$resolver)) {
-            self::$resolver = new Resolver();
-        }
+        $constructorParametersName = array_map(
+            fn (\ReflectionParameter $parameter) => $parameter->getName(),
+            $constructorParametersMeta
+        );
 
-        return self::$resolver;
-    }
+        $defaults = array_combine(
+            $constructorParametersName,
+            array_map(
+                fn (\ReflectionParameter $parameter) => $parameter->getDefaultValue(),
+                $constructorParametersMeta
+            )
+        );
 
-    /**
-     * @param \OAS\Resolver\Graph\Node|array $params
-     * @param array $metadata
-     * @return \OAS\Schema
-     */
-    public static function createFromPrimitives($params, array $metadata = []): self
-    {
-        if (\is_bool($params)) {
-            return $params
-                ? self::createAlwaysValidSchema() : self::createAlwaysInvalidSchema();
-        }
-
-        // for \json_decode($json, false) outputs
-        if ($params instanceof \stdClass) {
-            $params = (array) $params;
-        }
-
-        if (self::$resolve && !($metadata['resolved'] ?? false)) {
-            $params = self::getResolver()
-                ->resolveDecoded($params)
-                ->denormalize(true);
-
-            $metadata['resolved'] = true;
-        }
-
-        if (!\is_array($params)) {
-            throw new \TypeError(
-                'Parameter "params" must be of bool|array|\stdClass type'
-            );
-        }
-
-        return self::doCreateFromPrimitives(
-            self::normalizePropertyNames($params), $metadata
+        return new self(
+            ...array_values(
+                array_merge(
+                    $defaults, $params
+                )
+            )
         );
     }
 
-    public static function createAlwaysValidSchema(): self
+    public static function createBooleanSchema(bool $value): self
     {
         $schema = new self();
-        $schema->alwaysValid = true;
-
-        return $schema;
-    }
-
-    public static function createAlwaysInvalidSchema(): self
-    {
-        $schema = new self();
-        $schema->alwaysInvalid = true;
+        $schema->{$value ? 'alwaysValid' : 'alwaysInvalid'} = true;
 
         return $schema;
     }

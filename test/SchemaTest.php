@@ -1,12 +1,13 @@
 <?php declare(strict_types=1);
 
 use OAS\Schema;
-use OAS\Schema\Reference;
-use OAS\Resolver\Resolver;
+use OAS\Schema\Factory;
 use PHPUnit\Framework\TestCase;
 
 class SchemaTest extends TestCase
 {
+    private Factory $factory;
+
     /** @test */
     public function isInstantiable(): void
     {
@@ -22,7 +23,7 @@ class SchemaTest extends TestCase
     /** @test */
     public function isInstantiableFromPrimitiveTypes(): void
     {
-        $schema = Schema::createFromPrimitives([
+        $schema = $this->factory->createFromPrimitives([
             'anyOf' => [
                 [
                     'type' => 'string'
@@ -53,7 +54,6 @@ class SchemaTest extends TestCase
         $this->assertInstanceOf(Schema::class, $schema);
         $this->assertEquals(Schema::TYPE_ARRAY, $schema->getType());
         // by the fault additional items are allowed
-        $this->assertTrue($schema->additionalItemsAllowed());
         $this->assertNull($schema->getAdditionalItems());
         $this->assertFalse($schema->hasMinItems());
         $this->assertNull($schema->getMinItems());
@@ -65,7 +65,7 @@ class SchemaTest extends TestCase
         $this->assertNull($schema->getAdditionalItems());
 
         // items keyword
-        $schema = Schema::createFromPrimitives(
+        $schema = $this->factory->createFromPrimitives(
             [
                 'items' => [
                     'type' => 'string'
@@ -76,7 +76,7 @@ class SchemaTest extends TestCase
         $this->assertFalse($schema->isTuple());
 
         // items keyword: tuple
-        $schema = Schema::createFromPrimitives(
+        $schema = $this->factory->createFromPrimitives(
             [
                 'items' => [
                     [
@@ -97,7 +97,7 @@ class SchemaTest extends TestCase
         $this->assertEquals(Schema::TYPE_INTEGER, $schema->getItems()[1]->getType());
 
         // items & additionalItems keywords: additionalItems is boolean (createFromPrimitives)
-        $schema = Schema::createFromPrimitives(
+        $schema = $this->factory->createFromPrimitives(
             [
                 'items' => [
                     [
@@ -108,8 +108,7 @@ class SchemaTest extends TestCase
             ]
         );
         $this->assertIsArray($schema->getItems());
-        $this->assertTrue($schema->getAdditionalItems());
-        $this->assertTrue($schema->additionalItemsAllowed());
+        $this->assertTrue($schema->getAdditionalItems()->isAlwaysValid());
 
         // items & additionalItems keywords: additionalItems is always valid schema
         $schema = Schema::createFromArray(
@@ -117,12 +116,11 @@ class SchemaTest extends TestCase
                 'items' => [
                     Schema::createNumberType()
                 ],
-                'additionalItems' => Schema::createAlwaysValidSchema()
+                'additionalItems' => Schema::createBooleanSchema(true)
             ]
         );
         $this->assertIsArray($schema->getItems());
         $this->assertInstanceOf(Schema::class, $schema->getAdditionalItems());
-        $this->assertTrue($schema->additionalItemsAllowed());
 
         // items & additionalItems keywords: additionalItems is always invalid schema
         $schema = Schema::createFromArray(
@@ -130,13 +128,11 @@ class SchemaTest extends TestCase
                 'items' => [
                     Schema::createNumberType()
                 ],
-                'additionalItems' => Schema::createAlwaysInvalidSchema()
+                'additionalItems' => Schema::createBooleanSchema(false)
             ]
         );
         $this->assertIsArray($schema->getItems());
         $this->assertInstanceOf(Schema::class, $schema->getAdditionalItems());
-        // additional items are allowed but validation will always fail
-        $this->assertTrue($schema->additionalItemsAllowed());
     }
 
     /** @test */
@@ -330,7 +326,7 @@ class SchemaTest extends TestCase
     /** @test */
     public function itImplementsArrayAccessInterface(): void
     {
-        $schema =Schema::createFromPrimitives(
+        $schema = $this->factory->createFromPrimitives(
             [
                 'type' => 'object',
                 'properties' => [
@@ -354,7 +350,7 @@ class SchemaTest extends TestCase
     /** @test */
     public function itProvidesAccessToGraphNodesUsingPath(): void
     {
-        $schema =Schema::createFromPrimitives(
+        $schema = $this->factory->createFromPrimitives(
             [
                 'type' => 'object',
                 'properties' => [
@@ -376,7 +372,7 @@ class SchemaTest extends TestCase
     /** @test */
     public function itHandlesRecursion(): void
     {
-        $recursiveSchema = Schema::createFromPrimitives(
+        $recursiveSchema = $this->factory->createFromPrimitives(
             [
                 'properties' => [
                     'name' => [
@@ -402,8 +398,8 @@ class SchemaTest extends TestCase
     /** @test */
     public function itSerializesToJSON(): void
     {
-        $this->assertEquals("true", \json_encode(Schema::createAlwaysValidSchema()));
-        $this->assertEquals("false", \json_encode(Schema::createAlwaysInvalidSchema()));
+        $this->assertEquals("true", \json_encode(Schema::createBooleanSchema(true)));
+        $this->assertEquals("false", \json_encode(Schema::createBooleanSchema(false)));
         $this->assertEquals("{}", \json_encode(new Schema()));
         $this->assertEquals('{"const":null}', \json_encode(Schema::createFromArray(['const' => null])));
 
@@ -411,7 +407,7 @@ class SchemaTest extends TestCase
         $this->assertJsonStringEqualsJsonString(
             $schema,
             \json_encode(
-                Schema::createFromPrimitives(
+                $this->factory->createFromPrimitives(
                     \json_decode($schema)
                 )
             )
@@ -445,10 +441,15 @@ class SchemaTest extends TestCase
         $this->assertJsonStringEqualsJsonString(
             $schema,
             \json_encode(
-                Schema::createFromPrimitives(
+                $this->factory->createFromPrimitives(
                     \json_decode($schema)
                 )
             )
         );
+    }
+
+    public function setUp(): void
+    {
+        $this->factory = new Factory();
     }
 }
