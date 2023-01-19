@@ -22,7 +22,7 @@ class Dumper
         $this->resolver = $resolver;
         $dispatcher = new Dispatcher();
         $dispatcher->subscribe(
-            new SchemaConstructionEventsSubscriber(false)
+            new ConstructorEventSubscriber(false)
         );
 
         $this->constructor = new Constructor($dispatcher);

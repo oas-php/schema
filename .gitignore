@@ -1,4 +1,7 @@
 .idea
 .bash_history
+.DS_STORE
 vendor
 test.php
+.phpunit.cache
+tmp

@@ -2,98 +2,46 @@
 
 namespace OAS\Schema\Vocabulary;
 
+use InvalidArgumentException;
 use OAS\Schema\ConstNull;
 use function iter\all;
+use function OAS\Utils\assertTypeValid;
 
 trait Validation
 {
-    /** @var int|float|null */
-    private $multipleOf;
-
-    /** @var int|float|null */
-    private $maximum;
-
-    /** @var int|float|null */
-    private $exclusiveMaximum;
-
-    /** @var int|float|null */
-    private $minimum;
-
-    /** @var int|float|null */
-    private $exclusiveMinimum;
-
+    private null|int|float $multipleOf;
+    private null|int|float $maximum;
+    private null|int|float $exclusiveMaximum;
+    private null|int|float $minimum;
+    private null|int|float $exclusiveMinimum;
     private ?int $maxLength;
-
     private ?int $minLength;
-
     private ?string $pattern;
-
     private ?int $maxItems;
-
     private ?int $minItems;
-
     private ?bool $uniqueItems;
-
     private ?int $maxContains;
-
     private ?int $minContains;
-
     private ?int $maxProperties;
-
     private ?int $minProperties;
-
-    /** @var ?string[]  */
-    private ?array $required;
-
-    /**
-     *  map <string> => <string[]>
-     *
-     * @var ?string[]
-     */
-    private $dependentRequired;
-
-    /** @var \OAS\Schema\ConstNull|mixed  */
-    private $const;
-
-    /** @var ?string[] */
-    private ?array $enum;
-
-    /** @var array|string|null */
-    private $type;
-
-    private function setMultipleOf($multipleOf): void
-    {
-        if (!is_null($multipleOf) && !(is_int($multipleOf) || is_float($multipleOf))) {
-            throw new \TypeError(
-                'Parameter "multipleOf" must be of int|float|null type',
-            );
-        }
-
-        $this->multipleOf = $multipleOf;
-    }
+    /** @var ?array<int, string> $required*/
+    private ?array $required = null;
+    /** @var ?array<string, array<int, string>> $dependentRequired */
+    private ?array $dependentRequired = null;
+    private mixed $const;
+    /** @var ?array<int, mixed> $enum */
+    private ?array $enum = null;
+    /** @var null|string|array<int, string> $type */
+    private null|string|array $type;
 
     public function hasMultipleOf(): bool
     {
         return !is_null($this->schema()->multipleOf);
     }
 
-    /**
-     * @return float|int|null
-     */
-    public function getMultipleOf()
+    public function getMultipleOf(): null|int|float
     {
         return $this->schema()->multipleOf;
-    }
-
-    private function setMaximum($maximum): void
-    {
-        if (!is_null($maximum) && !(is_int($maximum) || is_float($maximum))) {
-            throw new \TypeError(
-                'Parameter "maximum" must be of int|float|null type',
-            );
-        }
-
-        $this->maximum = $maximum;
     }
 
     public function hasMaximum(): bool
@@ -101,24 +49,9 @@ trait Validation
         return !is_null($this->schema()->maximum);
     }
 
-    /**
-     * @return int|float|null
-     */
-    public function getMaximum()
+    public function getMaximum(): null|int|float
     {
         return $this->schema()->maximum;
-    }
-
-
-    private function setExclusiveMaximum($exclusiveMaximum): void
-    {
-        if (!is_null($exclusiveMaximum) && !(is_int($exclusiveMaximum) || is_float($exclusiveMaximum))) {
-            throw new \TypeError(
-                'Parameter "exclusiveMaximum" must be of int|float|null type',
-            );
-        }
-
-        $this->exclusiveMaximum = $exclusiveMaximum;
     }
 
     public function hasExclusiveMaximum(): bool
@@ -126,23 +59,9 @@ trait Validation
         return !is_null($this->schema()->exclusiveMaximum);
     }
 
-    /**
-     * @return float|int|null
-     */
-    public function getExclusiveMaximum()
+    public function getExclusiveMaximum(): null|int|float
     {
         return $this->schema()->exclusiveMaximum;
-    }
-
-    private function setMinimum($minimum): void
-    {
-        if (!is_null($minimum) && !(is_int($minimum) || is_float($minimum))) {
-            throw new \TypeError(
-                'Parameter "minimum" must be of int|float|null type',
-            );
-        }
-
-        $this->minimum = $minimum;
     }
 
     public function hasMinimum(): bool
@@ -150,23 +69,9 @@ trait Validation
         return !is_null($this->schema()->minimum);
     }
 
-    /**
-     * @return float|int|null
-     */
-    public function getMinimum()
+    public function getMinimum(): null|int|float
     {
         return $this->schema()->minimum;
-    }
-
-    private function setExclusiveMinimum($exclusiveMinimum): void
-    {
-        if (!is_null($exclusiveMinimum) && !(is_int($exclusiveMinimum) || is_float($exclusiveMinimum))) {
-            throw new \TypeError(
-                'Parameter "exclusiveMinimum" must be of int|float|null type',
-            );
-        }
-
-        $this->exclusiveMinimum = $exclusiveMinimum;
     }
 
     public function hasExclusiveMinimum(): bool
@@ -174,10 +79,7 @@ trait Validation
         return !is_null($this->schema()->exclusiveMinimum);
     }
 
-    /**
-     * @return float|int|null
-     */
-    public function getExclusiveMinimum()
+    public function getExclusiveMinimum(): null|int|float
     {
         return $this->schema()->exclusiveMinimum;
     }
@@ -282,13 +184,12 @@ trait Validation
         return $this->schema()->minProperties;
     }
 
-    private function setRequired(?array $required): void
+    /**
+     * @param array<int, string> $required
+     */
+    private function setRequired(array $required): void
     {
-        if (!all('is_string', $required ?? [])) {
-            throw new \TypeError(
-                'Parameter "required" must be of ?string[] type',
-            );
-        }
+        assertTypeValid('array<int, string>',  $required, 'required');
 
         $this->required = $required;
     }
@@ -298,27 +199,17 @@ trait Validation
         return !is_null($this->schema()->required);
     }
 
+    /**
+     * @return ?array<int, string>
+     */
     public function getRequired(): ?array
     {
         return $this->schema()->required;
     }
 
-    private function setDependentRequired(?array $dependentRequired): void
+    private function setDependentRequired(array $dependentRequired): void
     {
-        if (!is_null($dependentRequired)) {
-            $isMapOfStringLists = fn ($list) =>
-                is_array($list) && all('is_string', $list);
-
-            // checks if $dependentRequired has the following type:
-            // [
-            //   key <string> => list <string[]>
-            // ]
-            if (!all('is_string', array_keys($dependentRequired)) || !all($isMapOfStringLists, $dependentRequired)) {
-                throw new \TypeError(
-                    'Parameter "dependentRequired" must be of ?string[][] type',
-                );
-            }
-        }
+        assertTypeValid('array<string, array<int, string>>', $dependentRequired, 'dependentRequired');
 
         $this->dependentRequired = $dependentRequired;
     }
@@ -338,11 +229,18 @@ trait Validation
         return !is_null($this->schema()->const);
     }
 
-    public function getConst()
+    public function getConst(): mixed
     {
         $const = $this->schema()->const;
 
         return $const instanceof ConstNull ? null : $const;
+    }
+
+    private function setEnum(array $enum): void
+    {
+        assertTypeValid('array<int, mixed>', $enum, 'enum');
+
+        $this->enum = $enum;
     }
 
     public function hasEnum(): bool
@@ -360,41 +258,34 @@ trait Validation
         return !is_null($this->schema()->type);
     }
 
-    private function setType($type): void
+    /**
+     * @param string|array<int, string> $type
+     */
+    private function setType(string|array $type): void
     {
-        $types = $type;
+        assertTypeValid('string|array<int, string>', $type,'type');
 
-        if (!is_null($types)) {
-            if (is_string($types)) {
-                $types = [$types];
-            }
+        $types = is_string($type) ? [$type] : $type;
 
-            if (!is_array($types) && !all(fn($type) => is_string($type), $types)) {
-                throw new \TypeError(
-                    'Parameter "type" must be of string|string[]|null type',
-                );
-            }
+        if (!all(fn ($type) => in_array($type, self::TYPES), $types)) {
+            $wrapApostrophesAround = fn (string $value) => '"'.$value.'"';
 
-            $allowedTypes = self::TYPES;
-
-            if (!all(fn($type) => in_array($type, $allowedTypes), $types)) {
-                throw new \InvalidArgumentException(
-                    sprintf(
-                        'Parameter "type" value must be one of: %s ("%s" provided)',
-                        join(', ', self::TYPES),
-                        join(', ', $types)
-                    )
-                );
-            }
+            throw new InvalidArgumentException(
+                sprintf(
+                    'The "type" parameter must have one of the following values: %s (%s provided)',
+                    join(', ', array_map($wrapApostrophesAround, self::TYPES)),
+                    join(', ', array_map($wrapApostrophesAround, $types))
+                )
+            );
         }
 
         $this->type = $type;
     }
 
     /**
-     * @return string[]|string|null
+     * @return null|string|array<int, string>
      */
-    public function getType()
+    public function getType(): null|string|array
     {
         return $this->schema()->type;
     }

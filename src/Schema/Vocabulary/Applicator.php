@@ -3,63 +3,46 @@
 namespace OAS\Schema\Vocabulary;
 
 use OAS\Schema;
+use TypeError;
 use function iter\all;
 use function iter\func\operator;
+use function OAS\Utils\assertTypeValid;
 
 trait Applicator
 {
-    private ?Schema $additionalItems;
-
+    private ?Schema $additionalItems = null;
     // TODO
     private ?Schema $unevaluatedItems;
-
-    /** @var Schema[]|Schema|null  */
-    private $items;
-
-    private ?Schema $contains;
-
-    private ?Schema $additionalProperties;
-
+    /** @var null|Schema|array<int, Schema> $items  */
+    private null|Schema|array $items = null;
+    private ?Schema $contains = null;
+    private ?Schema $additionalProperties = null;
     private ?Schema $unevaluatedProperties;
-
-    /** @var ?Schema[] */
+    /** @var ?array<string, Schema> $properties */
     private ?array $properties;
-
-    /** @var ?Schema[] */
+    /** @var ?array<string, Schema> $patternProperties */
     private ?array $patternProperties;
-
-    /** @var ?Schema[] */
+    /** @var ?array<string, Schema> $dependentSchemas */
     private ?array $dependentSchemas;
-
     private ?Schema $propertyNames;
-
     private ?Schema $if;
-
     private ?Schema $then;
-
     private ?Schema $else;
-
-    /** @var ?Schema[] */
-    private ?array $allOf;
-
-    /** @var ?Schema[] */
-    private ?array $anyOf;
-
-    /** @var ?Schema[] */
-    private ?array $oneOf;
-
+    /** @var ?array<int, \OAS\Schema> $allOf*/
+    private ?array $allOf = null;
+    /** @var ?array<int, \OAS\Schema> $anyOf */
+    private ?array $anyOf = null;
+    /** @var ?array<int, \OAS\Schema> $oneOf */
+    private ?array $oneOf = null;
     private ?Schema $not;
 
-    private function setAdditionalItems(?Schema $additionalItems): void
+    private function setAdditionalItems(Schema $additionalItems): void
     {
-        if (!is_null($additionalItems)) {
-            $this->setChildren([$additionalItems]);
-        }
-
+        $this->setChildren([$additionalItems]);
         $this->additionalItems = $additionalItems;
     }
 
-    public function hasAdditionalItems()
+    public function hasAdditionalItems(): bool
     {
         return !is_null($this->schema()->additionalItems);
     }
@@ -69,20 +52,14 @@ trait Applicator
         return $this->schema()->additionalItems;
     }
 
-    private function setItems($items): void
+    /**
+     * @param \OAS\Schema|array<int, \OAS\Schema> $items
+     */
+    private function setItems(Schema|array $items = null): void
     {
-        if (!is_null($items)) {
-            $isSchema = $items instanceof Schema;
+        assertTypeValid('\OAS\Schema|array<int, \OAS\Schema>', $items, 'items');
 
-            if (!$isSchema && (!is_array($items) || !all(operator('instanceof', Schema::class), $items))) {
-                throw new \TypeError(
-                    'Parameter "items" must be of ?\OAS\Schema[]|\OAS\Schema type'
-                );
-            }
-
-            $this->setChildren($isSchema ? [$items] : $items);
-        }
-
+        $this->setChildren($items instanceof Schema ? [$items] : $items);
         $this->items = $items;
     }
 
@@ -97,19 +74,16 @@ trait Applicator
     }
 
     /**
-     * @return Schema[]|Schema|null
+     * @return array<int, Schema>|Schema|null
      */
-    public function getItems()
+    public function getItems(): array|Schema|null
     {
         return $this->schema()->items;
     }
 
-    private function setContains(?Schema $contains): void
+    private function setContains(Schema $contains): void
     {
-        if (!is_null($contains)) {
-            $this->setChildren([$contains]);
-        }
-
+        $this->setChildren([$contains]);
         $this->contains = $contains;
     }
 
@@ -123,12 +97,9 @@ trait Applicator
         return $this->schema()->contains;
     }
 
-    private function setAdditionalProperties(?Schema $additionalProperties): void
+    private function setAdditionalProperties(Schema $additionalProperties): void
     {
-        if (!is_null($additionalProperties)) {
-            $this->setChildren([$additionalProperties]);
-        }
-
+        $this->setChildren([$additionalProperties]);
         $this->additionalProperties = $additionalProperties;
     }
 
@@ -137,20 +108,20 @@ trait Applicator
         return !is_null($this->schema()->additionalProperties);
     }
 
-    /**
-     * @return \OAS\Schema|bool|null
-     */
-    public function getAdditionalProperties()
+    public function getAdditionalProperties(): Schema|bool|null
     {
         return $this->schema()->additionalProperties;
     }
 
+    /**
+     * TODO: validate keys (type)
+     *
+     * @param ?array<string, \OAS\Schema> $properties
+     */
     private function setProperties(?array $properties): void
     {
         if (!all(operator('instanceof', Schema::class), $properties ?? [])) {
-            throw new \TypeError(
-                'Parameter "properties" must be of ?\OAS\Schema[] type'
-            );
+            throw new TypeError('Parameter "properties" must be of ?\OAS\Schema[] type');
         }
 
         $this->setChildren($properties ?? []);
@@ -163,20 +134,22 @@ trait Applicator
     }
 
     /**
-     * @return \OAS\Schema[]|null
+     * @return ?array<string, \OAS\Schema>
      */
     public function getProperties(): ?array
     {
         return $this->schema()->properties;
     }
 
-
+    /**
+     * TODO: validate keys (type)
+     *
+     * @param ?array<string, \OAS\Schema> $patternProperties
+     */
     private function setPatternProperties(?array $patternProperties): void
     {
         if (!all(operator('instanceof', Schema::class), $patternProperties ?? [])) {
-            throw new \TypeError(
-                'Parameter "patternProperties" must be of ?\OAS\Schema[] type'
-            );
+            throw new TypeError('Parameter "patternProperties" must be of ?\OAS\Schema[] type');
         }
 
         $this->setChildren($patternProperties ?? []);
@@ -189,19 +162,20 @@ trait Applicator
     }
 
     /**
-     * @return \OAS\Schema[]|null
+     * @return ?<string, Schema>
      */
     public function getPatternProperties(): ?array
     {
         return $this->schema()->patternProperties;
     }
 
+    /**
+     * @param ?array<string, \OAS\Schema> $dependentSchemas
+     */
     private function setDependentSchemas(?array $dependentSchemas): void
     {
         if (!all(operator('instanceof', Schema::class), $dependentSchemas ?? [])) {
-            throw new \TypeError(
-                'Parameter "dependentSchemas" must be of ?\OAS\Schema[] type'
-            );
+            throw new TypeError('Parameter "dependentSchemas" must be of ?\OAS\Schema[] type');
         }
 
         $this->setChildren($dependentSchemas ?? []);
@@ -214,7 +188,7 @@ trait Applicator
     }
 
     /**
-     * @return \OAS\Schema[]|null
+     * @return ?<string, Schema>
      */
     public function getDependentSchemas(): ?array
     {
@@ -288,18 +262,14 @@ trait Applicator
         return $this->schema()->else;
     }
 
-    private function setAllOf(?array $allOf): void
+    /**
+     * @param array<int, \OAS\Schema> $allOf
+     */
+    private function setAllOf(array $allOf): void
     {
-        if (!is_null($allOf)) {
-            if (!all(operator('instanceof', Schema::class), $allOf)) {
-                throw new \TypeError(
-                    'Parameter "allOf" must be of ?\OAS\Schema[] type'
-                );
-            }
+        assertTypeValid('array<int, \OAS\Schema>', $allOf, 'allOf');
 
-            $this->setChildren($allOf);
-        }
-
+        $this->setChildren($allOf);
         $this->allOf = $allOf;
     }
 
@@ -309,25 +279,21 @@ trait Applicator
     }
 
     /**
-     * @return \OAS\Schema[]|null
+     * @return ?array<int, Schema>
      */
     public function getAllOf(): ?array
     {
         return $this->schema()->allOf;
     }
 
+    /**
+     * @param array<int, \OAS\Schema> $anyOf
+     */
     private function setAnyOf(?array $anyOf): void
     {
-        if (!is_null($anyOf)) {
-            if (!all(operator('instanceof', Schema::class), $anyOf ?? [])) {
-                throw new \TypeError(
-                    'Parameter "anyOf" must be of ?\OAS\Schema[] type'
-                );
-            }
+        assertTypeValid('array<int, \OAS\Schema>', $anyOf, 'anyOf');
 
-            $this->setChildren($anyOf);
-        }
-
+        $this->setChildren($anyOf);
         $this->anyOf = $anyOf;
     }
 
@@ -337,25 +303,21 @@ trait Applicator
     }
 
     /**
-     * @return \OAS\Schema[]|null
+     * @return ?array<int, \OAS\Schema>
      */
     public function getAnyOf(): ?array
     {
         return $this->schema()->anyOf;
     }
 
-    private function setOneOf(?array $oneOf): void
+    /**
+     * @param array<int, \OAS\Schema> $oneOf
+     */
+    private function setOneOf(array $oneOf): void
     {
-        if (!is_null($oneOf)) {
-            if (!all(operator('instanceof', Schema::class), $oneOf)) {
-                throw new \TypeError(
-                    'Parameter "oneOf" must be of ?\OAS\Schema[] type'
-                );
-            }
+        assertTypeValid('array<int, \OAS\Schema>', $oneOf, 'oneOf');
 
-            $this->setChildren($oneOf);
-        }
-
+        $this->setChildren($oneOf);
         $this->oneOf = $oneOf;
     }
 
@@ -365,7 +327,7 @@ trait Applicator
     }
 
     /**
-     * @return \OAS\Schema[]|null
+     * @return ?array<int, Schema>
      */
     public function getOneOf(): ?array
     {
@@ -389,5 +351,11 @@ trait Applicator
     public function getNot(): ?Schema
     {
         return $this->schema()->not;
+    }
+
+    private function isListOf(mixed $value, string $type): bool
+    {
+        return is_array($value) && all('is_int', array_keys($value))
+            && all(operator('instanceof', $type), $value);
     }
 }

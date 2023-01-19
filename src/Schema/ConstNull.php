@@ -4,8 +4,7 @@ namespace OAS\Schema;
 
 class ConstNull implements \JsonSerializable
 {
-    #[\ReturnTypeWillChange]
-    public function jsonSerialize()
+    public function jsonSerialize(): mixed
     {
         return null;
     }

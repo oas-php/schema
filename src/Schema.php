@@ -2,14 +2,17 @@
 
 namespace OAS;
 
+use ArrayAccess;
 use Biera\ArrayAccessor;
+use JsonSerializable;
 use OAS\Schema\Vocabulary;
 use OAS\Utils\Node;
 use OAS\Utils\Serializable;
+use stdClass;
 use function Biera\retrieveByPath;
 use function Biera\pathSegments;
 
-class Schema extends Node implements \JsonSerializable, \ArrayAccess
+class Schema extends Node implements JsonSerializable, ArrayAccess
 {
     use ArrayAccessor, Serializable;
     use Vocabulary\Core;
@@ -36,139 +39,97 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         self::TYPE_OBJECT
     ];
 
-    /** @var mixed */
-    private $example;
-
+    private mixed $example;
     private ?bool $alwaysValid = null;
-
     private ?bool $alwaysInvalid = null;
 
     /**
-     * @param string|null $_id
-     * @param string|null $_schema
-     * @param string|null $_anchor
-     * @param string|null $_ref
-     * @param string|null $_recursiveRef
-     * @param bool|null $_recursiveAnchor
-     * @param array|null $_vocabulary
-     * @param string|null $_comment
-     * @param \OAS\Schema[]|null $_defs
-     * @param string|null $title
-     * @param string|null $description
-     * @param null $default
-     * @param bool|null $deprecated
-     * @param bool|null $readOnly
-     * @param bool|null $writeOnly
-     * @param array|null $examples
-     * @param null $example
-     * @param string|null $format
-     * @param int|float|null $multipleOf
-     * @param int|float|null $maximum
-     * @param int|float|null $exclusiveMaximum
-     * @param int|float|null $minimum
-     * @param int|float|null $exclusiveMinimum
-     * @param int|null $maxLength
-     * @param int|null $minLength
-     * @param string|null $pattern
-     * @param int|null $minItems
-     * @param int|null $maxItems
-     * @param bool|null $uniqueItems
-     * @param int|null $maxContains
-     * @param int|null $minContains
-     * @param int|null $maxProperties
-     * @param int|null $minProperties
-     * @param string[]|null $required
-     * @param array|null $dependentRequired
-     * @param null $const
-     * @param array|null $enum
-     * @param string[]|string|null $type
-     * @param \OAS\Schema|null $additionalItems
-     * @param \OAS\Schema[]|\OAS\Schema|null $items
-     * @param \OAS\Schema|null $contains
-     * @param \OAS\Schema|null $additionalProperties
-     * @param \OAS\Schema[]|null $properties
-     * @param \OAS\Schema[]|null $patternProperties
-     * @param \OAS\Schema[]|null $dependentSchemas
-     * @param \OAS\Schema|null $propertyNames
-     * @param \OAS\Schema|null $if
-     * @param \OAS\Schema|null $then
-     * @param \OAS\Schema|null $else
-     * @param \OAS\Schema[]|null $allOf
-     * @param \OAS\Schema[]|null $anyOf
-     * @param \OAS\Schema[]|null $oneOf
-     * @param \OAS\Schema|null $not
+     * TODO: validate values like $minLength (must be a positive integer!)
+     *
+     * @param ?array<string, boolean> $_vocabulary
+     * @param ?array<string, \OAS\Schema> $_defs
+     * @param ?array<string> $required
+     * @param ?array<string, array<int, string>> $dependentRequired
+     * @param ?array<int, mixed> $enum
+     * @param array<string>|string|null $type
+     * @param array<int, \OAS\Schema>|\OAS\Schema|null $items
+     * @param ?array<string, \OAS\Schema> $properties
+     * @param ?array<string, \OAS\Schema> $patternProperties
+     * @param ?array<string, \OAS\Schema> $dependentSchemas
+     * @param ?array<int, \OAS\Schema> $allOf
+     * @param ?array<int, \OAS\Schema> $anyOf
+     * @param ?array<int, \OAS\Schema> $oneOf
      */
     public function __construct(
         // core
-        string $_id = null,
-        string $_schema = null,
-        string $_anchor = null,
-        string $_ref = null,
-        string $_recursiveRef = null,
-        bool $_recursiveAnchor = null,
-        array $_vocabulary = null,
-        string $_comment = null,
-        array $_defs = null,
+        ?string $_id = null,
+        ?string $_schema = null,
+        ?string $_anchor = null,
+        ?string $_ref = null,
+        ?string $_dynamicRef = null,
+        ?string $_dynamicAnchor = null,
+        ?array $_vocabulary = null,
+        ?string $_comment = null,
+        ?array  $_defs = null,
         // meta
-        string $title = null,
-        string $description = null,
-        $default = null,
-        bool $deprecated = null,
-        bool $readOnly = null,
-        bool $writeOnly = null,
+        ?string $title = null,
+        ?string $description = null,
+        mixed $default = null,
+        ?bool $deprecated = null,
+        ?bool $readOnly = null,
+        ?bool $writeOnly = null,
         ?array $examples = null,
-        $example = null,
         // format
-        string $format = null,
+        ?string $format = null,
         // validation
-        $multipleOf = null,
-        $maximum = null,
-        $exclusiveMaximum = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        int $maxLength = null,
-        int $minLength = null,
-        string $pattern = null,
-        int $minItems = null,
-        int $maxItems = null,
-        bool $uniqueItems = null,
-        int $maxContains = null,
-        int $minContains = null,
-        int $maxProperties = null,
-        int $minProperties = null,
-        array $required = null,
-        array $dependentRequired = null,
-        $const = null,
-        array $enum = null,
-        $type = null,
+        null|int|float $multipleOf = null,
+        null|int|float $maximum = null,
+        null|int|float $exclusiveMaximum = null,
+        null|int|float $minimum = null,
+        null|int|float $exclusiveMinimum = null,
+        ?int $maxLength = null,
+        ?int $minLength = null,
+        ?string $pattern = null,
+        ?int $minItems = null,
+        ?int $maxItems = null,
+        ?bool $uniqueItems = null,
+        ?int $maxContains = null,
+        ?int $minContains = null,
+        ?int $maxProperties = null,
+        ?int $minProperties = null,
+        ?array $required = null,
+        ?array $dependentRequired = null,
+        mixed $const = null,
+        ?array $enum = null,
+        array|string|null $type = null,
         // applicator
-        Schema $additionalItems = null,
-        $items = null,
-        Schema $contains = null,
-        Schema $additionalProperties = null,
-        array $properties = null,
-        array $patternProperties = null,
-        array $dependentSchemas = null,
-        Schema $propertyNames = null,
-        Schema $if = null,
-        Schema $then = null,
-        Schema $else = null,
-        array $allOf = null,
-        array $anyOf = null,
-        array $oneOf = null,
-        Schema $not = null
+        ?Schema $additionalItems = null,
+        array|Schema|null $items = null,
+        ?Schema $contains = null,
+        // TODO: should bool type allowed? perhaps Schema::createBooleanSchema is enough?
+        ?Schema $additionalProperties = null,
+        ?array $properties = null,
+        ?array $patternProperties = null,
+        ?array $dependentSchemas = null,
+        ?Schema $propertyNames = null,
+        ?Schema $if = null,
+        ?Schema $then = null,
+        ?Schema $else = null,
+        ?array $allOf = null,
+        ?array $anyOf = null,
+        ?array $oneOf = null,
+        ?Schema $not = null
     ) {
         // core
         $this->_id = $_id;
         $this->_schema = $_schema;
         $this->_anchor = $_anchor;
         $this->_ref = $_ref;
-        $this->_recursiveRef = $_recursiveRef;
-        $this->_recursiveAnchor = $_recursiveAnchor;
-        $this->_vocabulary = $_vocabulary;
+        $this->_dynamicRef = $_dynamicRef;
+        $this->_dynamicAnchor = $_dynamicAnchor;
+        if (!is_null($_vocabulary)) $this->setVocabulary($_vocabulary);
         $this->_comment = $_comment;
-        $this->setDefs($_defs);
-
+        if (!is_null($_defs)) $this->setDefs($_defs);
         // metadata
         $this->title = $title;
         $this->description = $description;
@@ -177,16 +138,14 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         $this->readOnly = $readOnly;
         $this->writeOnly = $writeOnly;
         $this->examples = $examples;
-        // TODO: to remove?
-        $this->example = $example;
         // format
         $this->format = $format;
         // validation
-        $this->setMultipleOf($multipleOf);
-        $this->setMaximum($maximum);
-        $this->setExclusiveMaximum($exclusiveMaximum);
-        $this->setMinimum($minimum);
-        $this->setExclusiveMinimum($exclusiveMinimum);
+        $this->multipleOf = $multipleOf;
+        $this->maximum = $maximum;
+        $this->exclusiveMaximum = $exclusiveMaximum;
+        $this->minimum = $minimum;
+        $this->exclusiveMinimum = $exclusiveMinimum;
         $this->maxLength = $maxLength;
         $this->minLength = $minLength;
         $this->pattern = $pattern;
@@ -197,16 +156,16 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         $this->minContains = $minContains;
         $this->maxProperties = $maxProperties;
         $this->minProperties = $minProperties;
-        $this->setRequired($required);
-        $this->setDependentRequired($dependentRequired);
+        if (!is_null($required)) $this->setRequired($required);
+        if (!is_null($dependentRequired)) $this->setDependentRequired($dependentRequired);
         $this->const = $const;
-        $this->enum = $enum;
-        $this->setType($type);
+        if (!is_null($enum)) $this->setEnum($enum);
+        if (!is_null($type)) $this->setType($type);
         // applicator
-        $this->setAdditionalItems($additionalItems);
-        $this->setItems($items);
-        $this->setContains($contains);
-        $this->setAdditionalProperties($additionalProperties);
+        if (!is_null($additionalItems)) $this->setAdditionalItems($additionalItems);
+        if (!is_null($items)) $this->setItems($items);
+        if (!is_null($contains)) $this->setContains($contains);
+        if (!is_null($additionalProperties)) $this->setAdditionalProperties($additionalProperties);
         $this->setProperties($properties);
         $this->setPatternProperties($patternProperties);
         $this->setDependentSchemas($dependentSchemas);
@@ -214,43 +173,10 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         $this->setIf($if);
         $this->setThen($then);
         $this->setElse($else);
-        $this->setAllOf($allOf);
-        $this->setOneOf($oneOf);
-        $this->setAnyOf($anyOf);
+        if (!is_null($allOf)) $this->setAllOf($allOf);
+        if (!is_null($oneOf)) $this->setOneOf($oneOf);
+        if (!is_null($anyOf)) $this->setAnyOf($anyOf);
         $this->setNot($not);
-    }
-
-    public static function createFromArray(array $params): self
-    {
-        if (\array_key_exists('const', $params) && \is_null($params['const'])) {
-            $params['const'] = new Schema\ConstNull;
-        }
-
-        $constructorParametersMeta =
-            (new \ReflectionClass(__CLASS__))
-                ->getConstructor()
-                ->getParameters();
-
-        $constructorParametersName = array_map(
-            fn (\ReflectionParameter $parameter) => $parameter->getName(),
-            $constructorParametersMeta
-        );
-
-        $defaults = array_combine(
-            $constructorParametersName,
-            array_map(
-                fn (\ReflectionParameter $parameter) => $parameter->getDefaultValue(),
-                $constructorParametersMeta
-            )
-        );
-
-        return new self(
-            ...array_values(
-                array_merge(
-                    $defaults, $params
-                )
-            )
-        );
     }
 
     public static function createBooleanSchema(bool $value): self
@@ -262,37 +188,27 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
     }
 
     public static function createStringType(
-        int $minLength = null,
-        int $maxLength  = null,
-        string $format = null,
-        string $pattern = null
+        ?int $minLength = null,
+        ?int $maxLength = null,
+        ?string $format = null,
+        ?string $pattern = null
     ): self
     {
-        return self::createFromArray(
-            [
-                'type' => Schema::TYPE_STRING,
-                'minLength' => $minLength,
-                'maxLength' => $maxLength,
-                'format' => $format,
-                'pattern' => $pattern
-            ]
+        return new self(
+            format: $format,
+            maxLength: $maxLength,
+            minLength: $minLength,
+            pattern: $pattern,
+            type: Schema::TYPE_STRING
         );
     }
 
-    /**
-     * @param int|float|null $multipleOf
-     * @param int|float|null $minimum
-     * @param int|float|null $exclusiveMinimum
-     * @param int|float|null $maximum
-     * @param int|float|null $exclusiveMaximum
-     * @return \OAS\Schema
-     */
     public static function createIntegerType(
-        $multipleOf = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        $maximum = null,
-        $exclusiveMaximum = null
+        int|float|null $multipleOf = null,
+        int|float|null $minimum = null,
+        int|float|null $exclusiveMinimum = null,
+        int|float|null $maximum = null,
+        int|float|null $exclusiveMaximum = null
     ): self
     {
         return self::createNumericType(
@@ -305,20 +221,12 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         );
     }
 
-    /**
-     * @param int|float|null $multipleOf
-     * @param int|float|null $minimum
-     * @param int|float|null $exclusiveMinimum
-     * @param int|float|null $maximum
-     * @param int|float|null $exclusiveMaximum
-     * @return \OAS\Schema
-     */
     public static function createNumberType(
-        $multipleOf = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        $maximum = null,
-        $exclusiveMaximum = null
+        int|float|null $multipleOf = null,
+        int|float|null $minimum = null,
+        int|float|null $exclusiveMinimum = null,
+        int|float|null $maximum = null,
+        int|float|null $exclusiveMaximum = null
     ): self
     {
         return self::createNumericType(
@@ -333,89 +241,68 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
 
     private static function createNumericType(
         string $type,
-        $multipleOf = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        $maximum = null,
-        $exclusiveMaximum = null
+        int|float|null $multipleOf = null,
+        int|float|null $minimum = null,
+        int|float|null $exclusiveMinimum = null,
+        int|float|null $maximum = null,
+        int|float|null $exclusiveMaximum = null
     ): self
     {
-        return self::createFromArray(
-            [
-                'type' => $type,
-                'multipleOf' => $multipleOf,
-                'minimum' => $minimum,
-                'exclusiveMinimum' => $exclusiveMinimum,
-                'maximum' => $maximum,
-                'exclusiveMaximum' => $exclusiveMaximum
-            ]
+        return new self(
+            multipleOf: $multipleOf,
+            maximum: $maximum,
+            exclusiveMaximum: $exclusiveMaximum,
+            minimum: $minimum,
+            exclusiveMinimum: $exclusiveMinimum,
+            type: $type
         );
     }
 
     /**
-     * @param Schema[]|Schema|null  $items
-     * @param Schema|null           $additionalItems
-     * @param int|null              $minItems
-     * @param int|null              $maxItems
-     * @param bool|null             $uniqueItems
-     * @param Schema|null           $contains
-     * @param int|null              $maxContains
-     * @param int|null              $minContains
-     * @return Schema
+     * @param array<int, Schema>|Schema|null $items
      */
     public static function createArrayType(
-        $items = null,
-        Schema $additionalItems = null,
-        int $minItems = null,
-        int $maxItems = null,
-        bool $uniqueItems = null,
-        Schema $contains = null,
-        int $maxContains = null,
-        int $minContains = null
+        array|Schema|null $items = null,
+        ?Schema $additionalItems = null,
+        ?int $minItems = null,
+        ?int $maxItems = null,
+        ?bool $uniqueItems = null,
+        ?Schema $contains = null,
+        ?int $maxContains = null,
+        ?int $minContains = null
     ): self
     {
-        $type = self::TYPE_ARRAY;
-
-        return self::createFromArray(
-            \compact(
-                'type',
-                'items',
-                'additionalItems',
-                'minItems',
-                'maxItems',
-                'uniqueItems',
-                'contains',
-                'maxContains',
-                'minContains'
-            )
+        return new self(
+            minItems: $minItems,
+            maxItems: $maxItems,
+            uniqueItems: $uniqueItems,
+            maxContains: $maxContains,
+            minContains: $minContains,
+            type: self::TYPE_ARRAY,
+            additionalItems: $additionalItems,
+            items: $items,
+            contains: $contains
         );
     }
 
     /**
-     * @param \OAS\Schema[]|null    $properties
-     * @param int|null              $minProperties
-     * @param int|null              $maxProperties
-     * @param \OAS\Schema|bool|null $additionalProperties
-     * @param array|null            $required
-     * @return \OAS\Schema
+     * @param ?array<int, \OAS\Schema> $properties
      */
     public static function createObjectType(
-        array $properties = null,
-        int $minProperties = null,
-        int $maxProperties = null,
-        $additionalProperties = null,
-        array $required = null
+        ?array $properties = null,
+        ?int $minProperties = null,
+        ?int $maxProperties = null,
+        null|bool|Schema $additionalProperties = null,
+        ?array $required = null
     ): self
     {
-        return self::createFromArray(
-            [
-                'type' => self::TYPE_OBJECT,
-                'properties' => $properties,
-                'minProperties' => $minProperties,
-                'maxProperties' => $maxProperties,
-                'additionalProperties' => $additionalProperties,
-                'required' => $required
-            ]
+        return new self(
+            maxProperties: $maxProperties,
+            minProperties: $minProperties,
+            required: $required,
+            type: self::TYPE_OBJECT,
+            additionalProperties: $additionalProperties,
+            properties: $properties
         );
     }
 
@@ -455,18 +342,12 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
 
     protected function isReference(): bool
     {
-        return $this->hasRef() || $this->hasRecursiveRef();
+        return $this->hasRef();
     }
 
-    /**
-     * @param string $path
-     * @return mixed
-     */
-    public function get(string $path)
+    public function get(string $path): mixed
     {
-        return retrieveByPath(
-            $this, pathSegments($path)
-        );
+        return retrieveByPath($this, pathSegments($path));
     }
 
     public function offsetExists($offset): bool
@@ -476,7 +357,7 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         );
     }
 
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
         return $this->schema()->{self::normalizePropertyName($offset)};
     }
@@ -499,7 +380,7 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
                         $propertyName[0] = '$';
                     }
 
-                    return  $propertyName;
+                    return $propertyName;
                 },
                 array_keys($properties)
             ),
@@ -508,7 +389,7 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
     }
 
     /**
-     * @param Schema[] $schemas
+     * @param array<int, \OAS\Schema> $schemas
      */
     private function setChildren(array $schemas): void
     {
@@ -517,8 +398,7 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         }
     }
 
-    #[\ReturnTypeWillChange]
-    public function jsonSerialize()
+    public function jsonSerialize(): stdClass|array|bool
     {
         if ($this->isAlwaysValid()) {
             return true;
@@ -530,12 +410,12 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
 
         $properties = array_filter(
             get_object_vars($this),
-            fn ($value, $property) => !is_null($value) && 0 !== strpos($property, '__'),
+            fn ($value, $property) => !is_null($value) && !str_starts_with($property, '__'),
             ARRAY_FILTER_USE_BOTH
         );
 
         return empty($properties)
-            ? new \stdClass()
+            ? new stdClass()
             : self::denormalizePropertyNames($properties);
     }
 }

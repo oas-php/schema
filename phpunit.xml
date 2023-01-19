@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<phpunit
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.1/phpunit.xsd"
+        colors="true"
+        beStrictAboutOutputDuringTests="true"
+        cacheDirectory=".phpunit.cache"
+        requireCoverageMetadata="true"
+>
+    <source>
+        <include>
+            <directory>./src</directory>
+        </include>
+    </source>
+</phpunit>

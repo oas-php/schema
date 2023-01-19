@@ -7,9 +7,6 @@
 * unevaluatedItems
 
 * $anchor
-* $comment
 * $recursiveAnchor
 * $recursiveRef
-* $schema 
-* $vocabulary
 

@@ -1,0 +1,11 @@
+looks like schema depends on phpdocumentor/reflection-common directly (constructor subscriber)
+unify error messages:  Parameter "type" value must be one of: null, string, number, integer, boolean, array, object ("float" provided)
+review everything and provide correct types (unions)
+unit test with 100% cc
+    -> schema instantiation tests
+    -> schema is traversable tests
+    -> schema may be created from primitives tests
+
+
+idea for lib: assertType('array<int, stdClass>');
+idea for lib: generate Postman collection from Document

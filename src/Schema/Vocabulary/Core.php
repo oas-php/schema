@@ -3,29 +3,23 @@
 namespace OAS\Schema\Vocabulary;
 
 use OAS\Schema;
+use TypeError;
 use function iter\all;
 use function iter\func\operator;
+use function OAS\Utils\assertTypeValid;
 
 trait Core
 {
     private ?string $_id;
-
     private ?string $_schema;
-
     private ?string $_anchor;
-
     private ?string $_ref;
-
-    private ?string $_recursiveRef;
-
-    private ?bool $_recursiveAnchor;
-
-    private ?array $_vocabulary;
-
+    private ?string $_dynamicRef;
+    private ?string $_dynamicAnchor;
+    private ?array $_vocabulary = null;
     private ?string $_comment;
-
-    /** @var ?Schema[] */
-    private ?array $_defs;
+    /** @var ?array<string, Schema> $_defs */
+    private ?array $_defs = null;
 
     public function hasId(): bool
     {
@@ -67,29 +61,34 @@ trait Core
         return $this->_ref;
     }
 
-    public function hasRecursiveRef(): bool
+    public function hasDynamicRef(): bool
     {
-        return !is_null($this->_recursiveRef);
+        return !is_null($this->_dynamicRef);
     }
 
-    public function getRecursiveRef(): ?string
+    public function getDynamicRef(): ?string
     {
-        return $this->_recursiveRef;
+        return $this->_dynamicRef;
     }
 
-    public function hasRecursiveAnchor(): bool
+    public function hasDynamicAnchor(): bool
     {
-        return !is_null($this->_recursiveAnchor);
+        return !is_null($this->_dynamicAnchor);
     }
 
-    public function getRecursiveAnchor(): ?bool
+    public function getDynamicAnchor(): ?string
     {
-        return $this->_recursiveAnchor;
+        return $this->_dynamicAnchor;
     }
 
-    public function isRecursiveAnchor(): ?bool
+    /**
+     * @param array<int, string> $_vocabulary
+     */
+    public function setVocabulary(array $_vocabulary): void
     {
-        return (bool) $this->_recursiveAnchor;
+        assertTypeValid('array<string, boolean>', $_vocabulary, '_vocabulary');
+
+        $this->_vocabulary = $_vocabulary;
     }
 
     public function hasVocabulary(): bool
@@ -97,6 +96,9 @@ trait Core
         return !is_null($this->schema()->_vocabulary);
     }
 
+    /**
+     * @return ?array<int, string>
+     */
     public function getVocabulary(): ?array
     {
         return $this->schema()->_vocabulary;
@@ -112,18 +114,14 @@ trait Core
         return $this->schema()->_comment;
     }
 
-    private function setDefs(?array $_defs): void
+    /**
+     * @param array<string, \OAS\Schema> $_defs
+     */
+    private function setDefs(array $_defs): void
     {
-        if (!is_null($_defs)) {
-            if (!all(operator('instanceof', Schema::class), $_defs)) {
-                throw new \TypeError(
-                    'Parameter "_defs" must be of ?\OAS\Schema[] type'
-                );
-            }
+        assertTypeValid('array<string, \OAS\Schema>', $_defs, '_defs');
 
-            $this->setChildren($_defs);
-        }
-
+        $this->setChildren($_defs);
         $this->_defs = $_defs;
     }
 
@@ -133,7 +131,7 @@ trait Core
     }
 
     /**
-     * @return Schema[]|null
+     * @return ?array<string, \OAS\Schema>
      */
     public function getDefs(): ?array
     {

@@ -5,17 +5,11 @@ namespace OAS\Schema\Vocabulary;
 trait MetaData
 {
     private ?string $title;
-
     private ?string $description;
-
-    private $default;
-
+    private mixed $default;
     private ?bool $deprecated;
-
     private ?bool $readOnly;
-
     private ?bool $writeOnly;
-
     private ?array $examples;
 
     public function hasTitle(): bool
@@ -60,7 +54,7 @@ trait MetaData
         return !is_null($this->schema()->default);
     }
 
-    public function getDefault()
+    public function getDefault(): mixed
     {
         return $this->schema()->default;
     }
