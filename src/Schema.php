@@ -2,173 +2,177 @@
 
 namespace OAS;
 
+use ArrayAccess;
 use Biera\ArrayAccessor;
+use JsonSerializable;
+use LogicException;
+use OAS\Resolver\Resolver;
+use OAS\Resolver\UnreachableFragmentError;
+use OAS\Schema\Factory;
+use OAS\Schema\Type;
 use OAS\Schema\Vocabulary;
 use OAS\Utils\Node;
 use OAS\Utils\Serializable;
+use RuntimeException;
+use stdClass;
 use function Biera\retrieveByPath;
 use function Biera\pathSegments;
 
-class Schema extends Node implements \JsonSerializable, \ArrayAccess
+// TODO: review connectivity (perhaps it does not have to extend Node?)
+// so: Node is necessary to provide connectivity between OAS\Schema and OAS\Document\*
+// connectivity requirements:
+//  * locate nodes by
+//      * absolute path (through root), like: "/$defs/foo"
+//.     * anchors ("plain fragments"), like: "foo"
+
+// perhaps there is a need to have connectivity features work twofold:
+//  * work on entire resolved resource;  e.g find|getGlobally()
+//  * work on single resource (searching for anchors should be done in this mode); find|get()
+
+class Schema extends Node implements JsonSerializable, ArrayAccess
 {
     use ArrayAccessor, Serializable;
     use Vocabulary\Core;
+    use Vocabulary\Applicator;
+    use Vocabulary\Validation;
     use Vocabulary\MetaData;
     use Vocabulary\Format;
-    use Vocabulary\Validation;
-    use Vocabulary\Applicator;
+    use Vocabulary\Unevaluated;
 
-    public const TYPE_NULL = 'null';
-    public const TYPE_STRING = 'string';
-    public const TYPE_NUMBER = 'number';
-    public const TYPE_INTEGER = 'integer';
-    public const TYPE_BOOLEAN = 'boolean';
-    public const TYPE_ARRAY = 'array';
-    public const TYPE_OBJECT = 'object';
+    private Schema|bool|null $reference = null;
 
-    public const TYPES = [
-        self::TYPE_NULL,
-        self::TYPE_STRING,
-        self::TYPE_NUMBER,
-        self::TYPE_INTEGER,
-        self::TYPE_BOOLEAN,
-        self::TYPE_ARRAY,
-        self::TYPE_OBJECT
-    ];
+    /** @var Schema|bool|array<string, Schema|bool>|null  */
+    private Schema|bool|array|null $dynamicReferences = null;
 
-    /** @var mixed */
-    private $example;
+    private ?string $resolvedId = null;
 
-    private ?bool $alwaysValid = null;
-
-    private ?bool $alwaysInvalid = null;
+    public static int $instancesCount = 0;
 
     /**
-     * @param string|null $_id
-     * @param string|null $_schema
-     * @param string|null $_anchor
-     * @param string|null $_ref
-     * @param string|null $_recursiveRef
-     * @param bool|null $_recursiveAnchor
-     * @param array|null $_vocabulary
-     * @param string|null $_comment
-     * @param \OAS\Schema[]|null $_defs
-     * @param string|null $title
-     * @param string|null $description
-     * @param null $default
-     * @param bool|null $deprecated
-     * @param bool|null $readOnly
-     * @param bool|null $writeOnly
-     * @param array|null $examples
-     * @param null $example
-     * @param string|null $format
-     * @param int|float|null $multipleOf
-     * @param int|float|null $maximum
-     * @param int|float|null $exclusiveMaximum
-     * @param int|float|null $minimum
-     * @param int|float|null $exclusiveMinimum
-     * @param int|null $maxLength
-     * @param int|null $minLength
-     * @param string|null $pattern
-     * @param int|null $minItems
-     * @param int|null $maxItems
-     * @param bool|null $uniqueItems
-     * @param int|null $maxContains
-     * @param int|null $minContains
-     * @param int|null $maxProperties
-     * @param int|null $minProperties
-     * @param string[]|null $required
-     * @param array|null $dependentRequired
-     * @param null $const
-     * @param array|null $enum
-     * @param string[]|string|null $type
-     * @param \OAS\Schema|null $additionalItems
-     * @param \OAS\Schema[]|\OAS\Schema|null $items
-     * @param \OAS\Schema|null $contains
-     * @param \OAS\Schema|null $additionalProperties
-     * @param \OAS\Schema[]|null $properties
-     * @param \OAS\Schema[]|null $patternProperties
-     * @param \OAS\Schema[]|null $dependentSchemas
-     * @param \OAS\Schema|null $propertyNames
-     * @param \OAS\Schema|null $if
-     * @param \OAS\Schema|null $then
-     * @param \OAS\Schema|null $else
-     * @param \OAS\Schema[]|null $allOf
-     * @param \OAS\Schema[]|null $anyOf
-     * @param \OAS\Schema[]|null $oneOf
-     * @param \OAS\Schema|null $not
+     * @param ?array<string, \OAS\Schema|bool> $_defs
+     * @param ?array<string, bool> $_vocabulary
+     * @param ?array<int, \OAS\Schema|bool> $allOf
+     * @param ?array<int, \OAS\Schema|bool> $anyOf
+     * @param ?array<int, \OAS\Schema|bool> $oneOf
+     * @param ?array<string, \OAS\Schema|bool> $dependentSchemas
+     * @param ?array<int, \OAS\Schema|bool> $prefixItems
+     * @param ?array<string, \OAS\Schema|bool> $properties
+     * @param ?array<string, \OAS\Schema|bool> $patternProperties
+     * @param Type|array<int, Type>|null $type
+     * @param ?array<int, mixed> $enum
+     * @param ?array<string> $required
+     * @param ?array<string, array<int, string>> $dependentRequired
      */
     public function __construct(
         // core
-        string $_id = null,
-        string $_schema = null,
-        string $_anchor = null,
-        string $_ref = null,
-        string $_recursiveRef = null,
-        bool $_recursiveAnchor = null,
-        array $_vocabulary = null,
-        string $_comment = null,
-        array $_defs = null,
-        // meta
-        string $title = null,
-        string $description = null,
-        $default = null,
-        bool $deprecated = null,
-        bool $readOnly = null,
-        bool $writeOnly = null,
-        ?array $examples = null,
-        $example = null,
-        // format
-        string $format = null,
-        // validation
-        $multipleOf = null,
-        $maximum = null,
-        $exclusiveMaximum = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        int $maxLength = null,
-        int $minLength = null,
-        string $pattern = null,
-        int $minItems = null,
-        int $maxItems = null,
-        bool $uniqueItems = null,
-        int $maxContains = null,
-        int $minContains = null,
-        int $maxProperties = null,
-        int $minProperties = null,
-        array $required = null,
-        array $dependentRequired = null,
-        $const = null,
-        array $enum = null,
-        $type = null,
+        ?string $_schema = null,
+        ?string $_id = null,
+        ?string $_ref = null,
+        ?array  $_defs = null,
+        ?string $_comment = null,
+        ?array $_vocabulary = null,
+        ?string $_dynamicRef = null,
+        ?string $_dynamicAnchor = null,
+        ?string $_anchor = null,
         // applicator
-        Schema $additionalItems = null,
-        $items = null,
-        Schema $contains = null,
-        Schema $additionalProperties = null,
-        array $properties = null,
-        array $patternProperties = null,
-        array $dependentSchemas = null,
-        Schema $propertyNames = null,
-        Schema $if = null,
-        Schema $then = null,
-        Schema $else = null,
-        array $allOf = null,
-        array $anyOf = null,
-        array $oneOf = null,
-        Schema $not = null
+        ?array $allOf = null,
+        ?array $anyOf = null,
+        ?array $oneOf = null,
+        Schema|bool|null $not = null,
+        Schema|bool|null $if = null,
+        Schema|bool|null $then = null,
+        Schema|bool|null $else = null,
+        ?array $dependentSchemas = null,
+        ?array $prefixItems = null,
+        Schema|bool|null $items = null,
+        Schema|bool|null $contains = null,
+        ?array $properties = null,
+        ?array $patternProperties = null,
+        Schema|bool|null $additionalProperties = null,
+        Schema|bool|null $propertyNames = null,
+        // validation
+        Type|array|null $type = null,
+        ?array $enum = null,
+        mixed $const = null,
+        int|float|null $multipleOf = null,
+        int|float|null $maximum = null,
+        int|float|null $exclusiveMaximum = null,
+        int|float|null $minimum = null,
+        int|float|null $exclusiveMinimum = null,
+        ?int $maxLength = null,
+        ?int $minLength = null,
+        ?string $pattern = null,
+        ?int $maxItems = null,
+        ?int $minItems = null,
+        ?bool $uniqueItems = null,
+        ?int $maxContains = null,
+        ?int $minContains = null,
+        ?int $maxProperties = null,
+        ?int $minProperties = null,
+        ?array $required = null,
+        ?array $dependentRequired = null,
+        // meta
+        ?string $title = null,
+        ?string $description = null,
+        mixed $default = null,
+        ?bool $deprecated = null,
+        ?bool $readOnly = null,
+        ?bool $writeOnly = null,
+        ?array $examples = null,
+        // format
+        ?string $format = null,
+        // unevaluated
+        Schema|bool|null $unevaluatedProperties = null,
+        Schema|bool|null $unevaluatedItems = null
     ) {
+        self::$instancesCount++;
         // core
         $this->_id = $_id;
         $this->_schema = $_schema;
         $this->_anchor = $_anchor;
         $this->_ref = $_ref;
-        $this->_recursiveRef = $_recursiveRef;
-        $this->_recursiveAnchor = $_recursiveAnchor;
-        $this->_vocabulary = $_vocabulary;
+        $this->_dynamicRef = $_dynamicRef;
+        $this->_dynamicAnchor = $_dynamicAnchor;
+        if (!is_null($_vocabulary)) $this->setVocabulary($_vocabulary);
         $this->_comment = $_comment;
-        $this->setDefs($_defs);
-
+        if (!is_null($_defs)) $this->setDefs($_defs);
+        // applicator
+        if (!is_null($allOf)) $this->setAllOf($allOf);
+        if (!is_null($anyOf)) $this->setAnyOf($anyOf);
+        if (!is_null($oneOf)) $this->setOneOf($oneOf);
+        if (!is_null($not)) $this->setNot($not);
+        if (!is_null($if)) $this->setIf($if);
+        if (!is_null($then)) $this->setThen($then);
+        if (!is_null($else)) $this->setElse($else);
+        if (!is_null($dependentSchemas)) $this->setDependentSchemas($dependentSchemas);
+        if (!is_null($prefixItems)) $this->setPrefixItems($prefixItems);
+        if (!is_null($items)) $this->setItems($items);
+        if (!is_null($contains)) $this->setContains($contains);
+        if (!is_null($properties)) $this->setProperties($properties);
+        if (!is_null($patternProperties)) $this->setPatternProperties($patternProperties);
+        if (!is_null($additionalProperties)) $this->setAdditionalProperties($additionalProperties);
+        if (!is_null($propertyNames)) $this->setPropertyNames($propertyNames);
+        // validation
+        if (!is_null($type)) $this->setType($type);
+        if (!is_null($enum)) $this->setEnum($enum);
+        $this->const = $const;
+        if (!is_null($multipleOf)) $this->setMultipleOf($multipleOf);
+        $this->maximum = $maximum;
+        $this->exclusiveMaximum = $exclusiveMaximum;
+        $this->minimum = $minimum;
+        $this->exclusiveMinimum = $exclusiveMinimum;
+        if (!is_null($maxLength)) $this->setMaxLength($maxLength);
+        if (!is_null($minLength)) $this->setMinLength($minLength);
+        $this->pattern = $pattern;
+        if (!is_null($maxItems)) $this->setMaxItems($maxItems);
+        if (!is_null($minItems)) $this->setMinItems($minItems);
+        $this->uniqueItems = $uniqueItems;
+        if (!is_null($maxContains)) $this->setMaxContains($maxContains);
+        if (!is_null($minContains)) $this->setMinContains($minContains);
+        if (!is_null($maxProperties)) $this->setMaxProperties($maxProperties);
+        if (!is_null($minProperties)) $this->setMinProperties($minProperties);
+        if (!is_null($required)) $this->setRequired($required);
+        if (!is_null($dependentRequired)) $this->setDependentRequired($dependentRequired);
         // metadata
         $this->title = $title;
         $this->description = $description;
@@ -177,308 +181,144 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         $this->readOnly = $readOnly;
         $this->writeOnly = $writeOnly;
         $this->examples = $examples;
-        // TODO: to remove?
-        $this->example = $example;
         // format
         $this->format = $format;
-        // validation
-        $this->setMultipleOf($multipleOf);
-        $this->setMaximum($maximum);
-        $this->setExclusiveMaximum($exclusiveMaximum);
-        $this->setMinimum($minimum);
-        $this->setExclusiveMinimum($exclusiveMinimum);
-        $this->maxLength = $maxLength;
-        $this->minLength = $minLength;
-        $this->pattern = $pattern;
-        $this->maxItems = $maxItems;
-        $this->minItems = $minItems;
-        $this->uniqueItems = $uniqueItems;
-        $this->maxContains = $maxContains;
-        $this->minContains = $minContains;
-        $this->maxProperties = $maxProperties;
-        $this->minProperties = $minProperties;
-        $this->setRequired($required);
-        $this->setDependentRequired($dependentRequired);
-        $this->const = $const;
-        $this->enum = $enum;
-        $this->setType($type);
-        // applicator
-        $this->setAdditionalItems($additionalItems);
-        $this->setItems($items);
-        $this->setContains($contains);
-        $this->setAdditionalProperties($additionalProperties);
-        $this->setProperties($properties);
-        $this->setPatternProperties($patternProperties);
-        $this->setDependentSchemas($dependentSchemas);
-        $this->propertyNames = $propertyNames;
-        $this->setIf($if);
-        $this->setThen($then);
-        $this->setElse($else);
-        $this->setAllOf($allOf);
-        $this->setOneOf($oneOf);
-        $this->setAnyOf($anyOf);
-        $this->setNot($not);
+        // unevaluated
+        if (!is_null($unevaluatedProperties)) $this->setUnevaluatedProperties($unevaluatedProperties);
+        if (!is_null($unevaluatedItems)) $this->setUnevaluatedItems($unevaluatedItems);
     }
 
-    public static function createFromArray(array $params): self
+    // TODO: is it really necessary? :)
+    public function __invoke(string $JSONPointer): mixed
     {
-        if (\array_key_exists('const', $params) && \is_null($params['const'])) {
-            $params['const'] = new Schema\ConstNull;
+        return $this->find($JSONPointer);
+    }
+
+    public function resolveId(string $id): void
+    {
+        $this->resolvedId = $id;
+    }
+
+    public function getResolvedId(): ?string
+    {
+        return $this->resolvedId;
+    }
+
+    /**
+     * @throws LogicException
+     * @throws RuntimeException
+     */
+    public function resolveReference(Schema|bool $reference): void
+    {
+        if ($this->_ref === null) {
+            // TODO: nicer message please
+            throw new LogicException('The schema does not  can not be resolved when schema does not a "$ref" keyword');
         }
 
-        $constructorParametersMeta =
-            (new \ReflectionClass(__CLASS__))
-                ->getConstructor()
-                ->getParameters();
-
-        $constructorParametersName = array_map(
-            fn (\ReflectionParameter $parameter) => $parameter->getName(),
-            $constructorParametersMeta
-        );
-
-        $defaults = array_combine(
-            $constructorParametersName,
-            array_map(
-                fn (\ReflectionParameter $parameter) => $parameter->getDefaultValue(),
-                $constructorParametersMeta
-            )
-        );
-
-        return new self(
-            ...array_values(
-                array_merge(
-                    $defaults, $params
-                )
-            )
-        );
-    }
-
-    public static function createBooleanSchema(bool $value): self
-    {
-        $schema = new self();
-        $schema->{$value ? 'alwaysValid' : 'alwaysInvalid'} = true;
-
-        return $schema;
-    }
-
-    public static function createStringType(
-        int $minLength = null,
-        int $maxLength  = null,
-        string $format = null,
-        string $pattern = null
-    ): self
-    {
-        return self::createFromArray(
-            [
-                'type' => Schema::TYPE_STRING,
-                'minLength' => $minLength,
-                'maxLength' => $maxLength,
-                'format' => $format,
-                'pattern' => $pattern
-            ]
-        );
-    }
-
-    /**
-     * @param int|float|null $multipleOf
-     * @param int|float|null $minimum
-     * @param int|float|null $exclusiveMinimum
-     * @param int|float|null $maximum
-     * @param int|float|null $exclusiveMaximum
-     * @return \OAS\Schema
-     */
-    public static function createIntegerType(
-        $multipleOf = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        $maximum = null,
-        $exclusiveMaximum = null
-    ): self
-    {
-        return self::createNumericType(
-            Schema::TYPE_INTEGER,
-            $multipleOf,
-            $minimum,
-            $exclusiveMinimum,
-            $maximum,
-            $exclusiveMaximum
-        );
-    }
-
-    /**
-     * @param int|float|null $multipleOf
-     * @param int|float|null $minimum
-     * @param int|float|null $exclusiveMinimum
-     * @param int|float|null $maximum
-     * @param int|float|null $exclusiveMaximum
-     * @return \OAS\Schema
-     */
-    public static function createNumberType(
-        $multipleOf = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        $maximum = null,
-        $exclusiveMaximum = null
-    ): self
-    {
-        return self::createNumericType(
-            self::TYPE_NUMBER,
-            $multipleOf,
-            $minimum,
-            $exclusiveMinimum,
-            $maximum,
-            $exclusiveMaximum
-        );
-    }
-
-    private static function createNumericType(
-        string $type,
-        $multipleOf = null,
-        $minimum = null,
-        $exclusiveMinimum = null,
-        $maximum = null,
-        $exclusiveMaximum = null
-    ): self
-    {
-        return self::createFromArray(
-            [
-                'type' => $type,
-                'multipleOf' => $multipleOf,
-                'minimum' => $minimum,
-                'exclusiveMinimum' => $exclusiveMinimum,
-                'maximum' => $maximum,
-                'exclusiveMaximum' => $exclusiveMaximum
-            ]
-        );
-    }
-
-    /**
-     * @param Schema[]|Schema|null  $items
-     * @param Schema|null           $additionalItems
-     * @param int|null              $minItems
-     * @param int|null              $maxItems
-     * @param bool|null             $uniqueItems
-     * @param Schema|null           $contains
-     * @param int|null              $maxContains
-     * @param int|null              $minContains
-     * @return Schema
-     */
-    public static function createArrayType(
-        $items = null,
-        Schema $additionalItems = null,
-        int $minItems = null,
-        int $maxItems = null,
-        bool $uniqueItems = null,
-        Schema $contains = null,
-        int $maxContains = null,
-        int $minContains = null
-    ): self
-    {
-        $type = self::TYPE_ARRAY;
-
-        return self::createFromArray(
-            \compact(
-                'type',
-                'items',
-                'additionalItems',
-                'minItems',
-                'maxItems',
-                'uniqueItems',
-                'contains',
-                'maxContains',
-                'minContains'
-            )
-        );
-    }
-
-    /**
-     * @param \OAS\Schema[]|null    $properties
-     * @param int|null              $minProperties
-     * @param int|null              $maxProperties
-     * @param \OAS\Schema|bool|null $additionalProperties
-     * @param array|null            $required
-     * @return \OAS\Schema
-     */
-    public static function createObjectType(
-        array $properties = null,
-        int $minProperties = null,
-        int $maxProperties = null,
-        $additionalProperties = null,
-        array $required = null
-    ): self
-    {
-        return self::createFromArray(
-            [
-                'type' => self::TYPE_OBJECT,
-                'properties' => $properties,
-                'minProperties' => $minProperties,
-                'maxProperties' => $maxProperties,
-                'additionalProperties' => $additionalProperties,
-                'required' => $required
-            ]
-        );
-    }
-
-    public function hasExample(): bool
-    {
-        return !is_null($this->schema()->example);
-    }
-
-    public function getExample()
-    {
-        return $this->schema()->example;
-    }
-
-    public function isAlwaysValid(): bool
-    {
-        return (bool) $this->schema()->alwaysValid;
-    }
-
-    public function isAlwaysInvalid(): bool
-    {
-        return (bool) $this->schema()->alwaysInvalid;
-    }
-
-    public function getReference(): ?Schema
-    {
-        if ($this->hasRef()) {
-            return $this->find($this->_ref);
+        if ($this->reference !== null) {
+            throw new RuntimeException('The reference is already resolved');
         }
 
-        return null;
+        $this->reference = $reference;
     }
 
-    protected function schema(): self
+    public function getResolvedReference(): Schema|bool|null
     {
-        return $this->isReference() ? $this->getReference() : $this;
-    }
+        if ($this->reference !== null) {
+            return $this->reference;
+        }
 
-    protected function isReference(): bool
-    {
-        return $this->hasRef() || $this->hasRecursiveRef();
+        if ($this->_ref !== null) {
+            $ref = $this->_ref;
+
+            if (!str_starts_with($ref, '#')) {
+                // TODO: dedicated exception?
+                throw new RuntimeException(
+                    sprintf(
+                        'Reference not resolved (it could  be resolved by %s with %s provided)',
+                        Factory::class,
+                        Resolver::class
+                    )
+                );
+            }
+
+            try {
+                $fragment = substr($ref, 1);
+                $referencedSchema = $this->getRoot()->find($fragment);
+
+                if (!($referencedSchema instanceof Schema || is_bool($referencedSchema))) {
+                    // TODO: throw a dedicated exception
+                    throw new RuntimeException('$ref must point to a valid schema');
+                }
+
+                $this->reference = $referencedSchema;
+            } catch (RuntimeException) {
+                // TODO: check if resolver throws it with "#" prefixed!
+                throw new UnreachableFragmentError($fragment);
+            }
+        }
+
+        return $this->reference;
     }
 
     /**
-     * @param string $path
-     * @return mixed
+     * @param Schema|array<string, Schema> $dynamicReferences
      */
-    public function get(string $path)
+    public function resolveDynamicReference(Schema|bool|array $dynamicReferences): void
     {
-        return retrieveByPath(
-            $this, pathSegments($path)
-        );
+        if ($this->dynamicReferences !== null) {
+            throw new RuntimeException('The dynamic reference is already resolved');
+        }
+
+        $this->dynamicReferences = $dynamicReferences;
     }
 
+    /**
+     * @return Schema|bool|array<string, Schema|bool>|null
+     */
+    public function getDynamicReference(): Schema|bool|array|null
+    {
+        return $this->dynamicReferences;
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    public function find(string $path): mixed
+    {
+        if (str_starts_with($path, '/')) {
+            return parent::find($path);
+        }
+
+        /** @var Schema $schema */
+        foreach ($this->getRoot() as $schema) {
+            if ($schema->getAnchor() === $path) {
+                return $schema;
+            }
+        }
+
+        // TODO throw dedicated exception!
+        throw new RuntimeException("The path \"{$path}\" does not exist");
+    }
+
+    // TODO: verify usage and perhaps replace by Node::find?
+    public function get(string $path): mixed
+    {
+        return retrieveByPath($this, array_map('OAS\Resolver\decode', pathSegments($path)));
+    }
+
+    // TODO: review Biera\ArrayAccess ;-)
     public function offsetExists($offset): bool
     {
         return in_array(
-            self::normalizePropertyName($offset), $this->getReflectedProperties()
+            self::normalizePropertyName($offset),
+            $this->getReflectedProperties()
         );
     }
 
-    public function offsetGet($offset)
+    public function offsetGet($offset): mixed
     {
-        return $this->schema()->{self::normalizePropertyName($offset)};
+        return $this->{self::normalizePropertyName($offset)};
     }
 
     private static function normalizePropertyName(string $propertyName): string
@@ -495,11 +335,12 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         return array_combine(
             array_map(
                 function ($propertyName) {
+                    // TODO: stop using empty ("0" is "empty"), better use strlen() > 0
                     if (!empty($propertyName) && '_' == $propertyName[0]) {
                         $propertyName[0] = '$';
                     }
 
-                    return  $propertyName;
+                    return $propertyName;
                 },
                 array_keys($properties)
             ),
@@ -507,35 +348,47 @@ class Schema extends Node implements \JsonSerializable, \ArrayAccess
         );
     }
 
-    /**
-     * @param Schema[] $schemas
-     */
-    private function setChildren(array $schemas): void
+    private function setChild(Schema|bool $schema, $path): void
     {
-        foreach ($schemas as $schema) {
-            $this->__connect($schema);
+        if ($schema instanceof Schema) {
+            $this->__connect($schema, [$path]);
         }
     }
 
-    #[\ReturnTypeWillChange]
-    public function jsonSerialize()
+    /**
+     * @param array<int, \OAS\Schema|bool> $schemas
+     * @param array<int, string> $path
+     */
+    private function setChildren(array $schemas, array $path = []): void
     {
-        if ($this->isAlwaysValid()) {
-            return true;
+        foreach ($schemas as $pathSegment => $schema) {
+            if ($schema instanceof Schema) {
+                $this->__connect($schema, [...$path, $pathSegment]);
+            }
         }
+    }
 
-        if ($this->isAlwaysInvalid()) {
-            return false;
-        }
+    public function jsonSerialize(): stdClass|array|bool
+    {
+        $exclude = ['reference', 'dynamicReferences', 'resolvedId'];
 
         $properties = array_filter(
             get_object_vars($this),
-            fn ($value, $property) => !is_null($value) && 0 !== strpos($property, '__'),
+            fn ($value, $property) =>
+                !is_null($value)
+                && !str_starts_with($property, '__')
+                && !in_array($property, $exclude),
             ARRAY_FILTER_USE_BOTH
         );
 
         return empty($properties)
-            ? new \stdClass()
+            ? new stdClass()
             : self::denormalizePropertyNames($properties);
+    }
+
+    // TODO: is this necessary?
+    public function path(): string
+    {
+       return join('/', $this->getRootPath());
     }
 }

@@ -8,11 +8,11 @@ trait Format
 
     public function hasFormat(): bool
     {
-        return !is_null($this->schema()->format);
+        return !is_null($this->format);
     }
 
     public function getFormat(): ?string
     {
-        return $this->schema()->format;
+        return $this->format;
     }
 }
